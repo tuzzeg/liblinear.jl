@@ -37,7 +37,7 @@ immutable Parameter
   nr_weight::Cint
   weight_label::Ptr{Cint}
   weight::Ptr{Cdouble}
-  double p::Cdouble
+  p::Cdouble
 end
 
 immutable Model
