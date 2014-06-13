@@ -1,5 +1,6 @@
 module liblinear
 
-# package code goes here
+include("c.jl")
+import .c: FeatureNode, Parameter, Problem
 
 end # module
