@@ -35,12 +35,11 @@ function problem{X, Y}(x::Array{X, 2}, y::Array{Y, 1})
   Problem(rows, cols, pointer(y_c), pointer(p_nodes), -1)
 end
 
-function parameter(params::Params)
+function parameter(p::Params)
   nr_weight = 0
   weight_label = Cint[]
   weight = Cdouble[]
-  p = 0.1
-  Parameter(params.solver, params.eps, params.C, nr_weight, pointer(weight_label), pointer(weight), p)
+  Parameter(p.solver, p.eps, p.C, nr_weight, pointer(weight_label), pointer(weight), 0.1)
 end
 
 function test_train()
