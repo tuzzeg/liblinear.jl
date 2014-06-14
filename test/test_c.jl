@@ -27,7 +27,7 @@ function test_train()
   n = 4
   y = Cdouble[1, 1, -1, -1]
   bias = -1
-  p_problem = [Problem(l, n, pointer(y), pointer(x), bias)]
+  problem = Problem(l, n, pointer(y), pointer(x), bias)
 
   solver_type = 0
   eps = 0.1
@@ -36,9 +36,11 @@ function test_train()
   weight_label = Cint[]
   weight = Cdouble[]
   p = 0.1
-  p_param = [Parameter(solver_type, eps, C, nr_weight, pointer(weight_label), pointer(weight), p)]
+  param = Parameter(solver_type, eps, C, nr_weight, pointer(weight_label), pointer(weight), p)
 
-  p_model = c.train(p_problem, p_param)
+  c.set_silence(false)
+
+  p_model = c.train(problem, param)
   model = unsafe_load(p_model)
   w = pointer_to_array(model.w, 4)
   labels = pointer_to_array(model.label, 2)

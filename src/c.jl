@@ -77,8 +77,12 @@ immutable Model
   bias::Cdouble
 end
 
-function train(problem, param)
+function train(problem::Ptr{Problem}, param::Ptr{Parameter})
   ccall((:train, liblinear), Ptr{Model}, (Ptr{Problem}, Ptr{Parameter}), problem, param)
+end
+
+function train(problem::Problem, param::Parameter)
+  ccall((:train, liblinear), Ptr{Model}, (Ptr{Problem}, Ptr{Parameter}), &problem, &param)
 end
 
 function free_model_content(model::Ptr{Model})
@@ -92,5 +96,18 @@ end
 function destroy_param(param::Ptr{Parameter});
   ccall((:destroy_param, liblinear), Void, (Ptr{Parameter},), param)
 end
+
+print_null(s::Ptr{Uint8}) = nothing
+const print_null_c = cfunction(print_null, Void, (Ptr{Uint8},))
+
+function set_silence(silent::Bool)
+  if silent
+    ccall((:set_print_string_function, liblinear), Void, (Ptr{Void},), print_null_c)
+  else
+    ccall((:set_print_string_function, liblinear), Void, (Ptr{Void},), C_NULL)
+  end
+end
+
+# TODO add check_param
 
 end # module
