@@ -1,46 +1,7 @@
 using Base.Test
 
-require("src/liblinear.jl")
-import liblinear: Params
-
 require("src/c.jl")
 import c: FeatureNode, Parameter, Problem
-
-function problem{X, Y}(x::Array{X, 2}, y::Array{Y, 1})
-  rows, cols = size(x)
-  if rows != length(y)
-    throw(ArgumentError("x and y dimentions should match, x=$(size(x)) y=$(size(y))"))
-  end
-
-  # X
-  nodes = Array(FeatureNode, rows*(cols+1))
-  p_nodes = Array(Ptr{FeatureNode}, rows)
-  i = 1
-  for r in 1:rows
-    p_nodes[r] = pointer(nodes, i)
-    for c in 1:cols
-      v = x[r, c]
-      if v != 0
-        nodes[i] = FeatureNode(c, convert(Cfloat, v))
-        i += 1
-      end
-    end
-    nodes[i] = FeatureNode(-1, convert(Cfloat, 0))
-    i += 1
-  end
-
-  # Y
-  y_c = convert(Array{Cdouble, 1}, y)
-
-  Problem(rows, cols, pointer(y_c), pointer(p_nodes), -1)
-end
-
-function parameter(p::Params)
-  nr_weight = 0
-  weight_label = Cint[]
-  weight = Cdouble[]
-  Parameter(p.solver, p.eps, p.C, nr_weight, pointer(weight_label), pointer(weight), 0.1)
-end
 
 function test_train()
   #+1 1:-1 3:1
@@ -48,18 +9,36 @@ function test_train()
   #-1 2:-1 3:-0.5
   #-1 1:1 2:-1 4:-1
 
-  params = Params()
-  param_c = parameter(params)
+  n(i, x) = FeatureNode(i, x)
+  xx = FeatureNode[
+    n(1, -1), n(3, 1), n(-1, 0),
+    n(1, -1), n(4, 1), n(-1, 0),
+    n(2, -1), n(3, -0.5), n(-1, 0),
+    n(1, 1), n(2, -1), n(4, -1), n(-1, 0)
+  ]
+  x = Ptr{FeatureNode}[
+    pointer(xx, 1),
+    pointer(xx, 4),
+    pointer(xx, 7),
+    pointer(xx, 10)
+  ]
 
-  x = [ -1  0 1 0;
-        -1  0 0 1;
-         0 -1 -0.5 0;
-         1 -1 0 -1
-      ]
-  y = [1, 1, -1, -1]
-  prob_c = problem(x, y)
+  l = 4
+  n = 4
+  y = Cdouble[1, 1, -1, -1]
+  bias = -1
+  p_problem = [Problem(l, n, pointer(y), pointer(x), bias)]
 
-  p_model = c.train(pointer(Problem[prob_c]), pointer(Parameter[param_c]))
+  solver_type = 0
+  eps = 0.1
+  C = 1.0
+  nr_weight = 0
+  weight_label = Cint[]
+  weight = Cdouble[]
+  p = 0.1
+  p_param = [Parameter(solver_type, eps, C, nr_weight, pointer(weight_label), pointer(weight), p)]
+
+  p_model = c.train(p_problem, p_param)
   model = unsafe_load(p_model)
   w = pointer_to_array(model.w, 4)
   labels = pointer_to_array(model.label, 2)
