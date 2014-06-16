@@ -42,6 +42,10 @@ const L2R_L2LOSS_SVR = convert(Cint, 11)
 const L2R_L2LOSS_SVR_DUAL = convert(Cint, 12)
 const L2R_L1LOSS_SVR_DUAL = convert(Cint, 13)
 
+function valid_solver(solver::Int)
+  0 <= solver <= 7 || 11 <= solver <= 13
+end
+
 immutable Parameter
   solver_type::Cint
 
@@ -97,6 +101,7 @@ function destroy_param(param::Ptr{Parameter});
   ccall((:destroy_param, liblinear), Void, (Ptr{Parameter},), param)
 end
 
+# Function callback for silent log
 print_null(s::Ptr{Uint8}) = nothing
 const print_null_c = cfunction(print_null, Void, (Ptr{Uint8},))
 
@@ -107,7 +112,5 @@ function set_silence(silent::Bool)
     ccall((:set_print_string_function, liblinear), Void, (Ptr{Void},), C_NULL)
   end
 end
-
-# TODO add check_param
 
 end # module
