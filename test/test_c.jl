@@ -25,7 +25,7 @@ function test_train()
 
   l = 4
   n = 4
-  y = Cdouble[1, 1, -1, -1]
+  y = Cdouble[1, 1, 2, 2]
   bias = -1
   problem = Problem(l, n, pointer(y), pointer(x), bias)
 
@@ -42,8 +42,11 @@ function test_train()
 
   p_model = c.train(problem, param)
   model = unsafe_load(p_model)
-  w = pointer_to_array(model.w, 4)
-  labels = pointer_to_array(model.label, 2)
+  w = pointer_to_array(model.w, int(model.nr_feature))
+  labels = pointer_to_array(model.label, int(model.nr_class))
+
+  println(w)
+  println(labels)
 
   @test_approx_eq_eps [-0.67219, 0.49949, 0.41542, 0.41921] w 1e-4
 end
