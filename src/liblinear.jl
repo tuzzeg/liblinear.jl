@@ -1,6 +1,6 @@
 module liblinear
 
-import StatsBase: StatisticalModel, fit
+import StatsBase: StatisticalModel, fit, predict
 
 include("c.jl")
 import .c: FeatureNode, Parameter, Problem, valid_solver
@@ -59,6 +59,13 @@ function fit{X, Y}(::Type{RegressionModel}, x::Array{X, 2}, y::Array{Y, 1}, para
   w = pointer_to_array(model.w, n_features)
   # labels = pointer_to_array(model.label, n_classes)
   RegressionModel(w)
+end
+
+function predict{X}(model::RegressionModel, x::Array{X, 2})
+  w = model.weights
+  r = x * w
+  o = ones(r)
+  o ./ (o+exp(-r))
 end
 
 function _check_params(solver, C, eps)
