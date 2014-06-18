@@ -85,4 +85,7 @@ end
 # - 2 Class/Multiclass
 # - Bias/no bias
 
+# StatBase.fit(::Type{Model}, x, y, params) :: Model
+# StatBase.predict(model::Model, x) -> x'
+
 end # module
