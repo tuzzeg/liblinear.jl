@@ -31,4 +31,12 @@ function test_train()
   @test_approx_eq_eps [0.768302,0.724725,0.130681,0.132732] y1 1e-4
 end
 
+function test_train_y_2dim()
+  params = ClassificationParams((0, 1); eps=0.01)
+
+  model = fit(RegressionModel, x_train, y_train', params)
+  @test_approx_eq_eps [0.174465,0.477886,-0.827468,-0.373797] model.weights 1e-4
+end
+
 test_train()
+test_train_y_2dim()

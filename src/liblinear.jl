@@ -3,7 +3,7 @@ module liblinear
 import StatsBase: StatisticalModel, fit, predict
 
 include("c.jl")
-import .c: FeatureNode, Parameter, Problem, valid_solver
+using .c: FeatureNode, Parameter, Problem, valid_solver, free_and_destroy_model
 
 immutable ClassificationParams{N, Y}
   solver::Int
@@ -34,6 +34,14 @@ function RegressionParams(; solver::Int=0, C::Float64=1.0, eps::Float64=0.1)
   RegressionParams(solver, C, eps)
 end
 
+immutable Model
+  nr_class::Int # number of classes
+  nr_feature::Int
+  weights::Array{Float64, 2}
+  label::Array{Int, 1} # label of each class
+  bias::Float32
+end
+
 immutable ClassificationModel{Y} <: StatisticalModel
   labels::NTuple{2, Y}
   weights::Array{Float64, 2}
@@ -46,19 +54,15 @@ end
 # Fit regression model for the given x,y
 # x should be of type convertible to Float64
 function fit{X, Y}(::Type{RegressionModel}, x::Array{X, 2}, y::Array{Y, 1}, params::ClassificationParams{2, Y}; verbose::Bool=false)
-  c.set_silence(!verbose)
+  model = _train(_parameter(params), _problem(x, y))
+  n_features, n_classes = size(model.weights)
+  @assert 1 == n_classes
+  RegressionModel(reshape(model.weights, (n_features,)))
+end
 
-  prob_c = _problem(x, y)
-  param_c = _parameter(params)
-  p_model = c.train(prob_c, param_c)
-  model = unsafe_load(p_model)
-
-  # TODO correctly free mem after train
-  n_features = int(model.nr_feature)
-  n_classes = int(model.nr_class)
-  w = pointer_to_array(model.w, n_features)
-  # labels = pointer_to_array(model.label, n_classes)
-  RegressionModel(w)
+function fit{Y}(T, x, y::Array{Y, 2}, params; verbose::Bool=false)#={{{=##=}}}=#
+  n_examples, n_features = size(x)
+  fit(T, x, reshape(y, (n_examples,)), params; verbose=verbose)
 end
 
 function predict{X}(model::RegressionModel, x::Array{X, 2})
@@ -117,6 +121,26 @@ end
 
 function _parameter(p::RegressionParams)
   Parameter(p.solver, p.eps, p.C, 0, C_NULL, C_NULL, 0.1)
+end
+
+# Train model, correctly free resources allocated by C lib
+function _train(param::Parameter, problem::Problem; verbose=false)
+  c.set_silence(!verbose)
+
+  p_model = c.train(problem, param)
+  model = unsafe_load(p_model)
+
+  n_features = int(model.nr_feature)
+  n_classes = int(model.nr_class)
+  # Different weight vector in two classes vs multi class classification
+  w_dims = (2 == n_classes) ? (n_features,1) : (n_features, n_classes)
+  w = copy(pointer_to_array(model.w, w_dims))
+  labels = copy(pointer_to_array(model.label, n_classes))
+  bias = float(model.bias)
+
+  free_and_destroy_model(p_model)
+
+  Model(n_features, n_classes, w, labels, bias)
 end
 
 # Cases:

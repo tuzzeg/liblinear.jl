@@ -93,8 +93,8 @@ function free_model_content(model::Ptr{Model})
   ccall((:free_model_content, liblinear), Void, (Ptr{Model},), model)
 end
 
-function free_and_destroy_model(model::Ptr{Ptr{Model}})
-  ccall((:free_and_destroy_model, liblinear), Void, (Ptr{Ptr{Model}},), model)
+function free_and_destroy_model(model::Ptr{Model})
+  ccall((:free_and_destroy_model, liblinear), Void, (Ptr{Ptr{Model}},), &model)
 end
 
 function destroy_param(param::Ptr{Parameter});
