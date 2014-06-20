@@ -38,5 +38,12 @@ function test_train_y_2dim()
   @test_approx_eq_eps [0.174465,0.477886,-0.827468,-0.373797] model.weights 1e-4
 end
 
+function test_train_unknown_class()
+  params = ClassificationParams((-1, 1); eps=0.01)
+
+  @test_throws KeyError fit(RegressionModel, x_train, y_train, params)
+end
+
 test_train()
 test_train_y_2dim()
+test_train_unknown_class()

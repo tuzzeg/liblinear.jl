@@ -54,7 +54,8 @@ end
 # Fit regression model for the given x,y
 # x should be of type convertible to Float64
 function fit{X, Y}(::Type{RegressionModel}, x::Array{X, 2}, y::Array{Y, 1}, params::ClassificationParams{2, Y}; verbose::Bool=false)
-  model = _train(_parameter(params), _problem(x, y))
+  y_map = (Y=>Cdouble)[y=>i for (i, y) in enumerate(params.labels)]
+  model = _train(_parameter(params), _problem(x, y; map_y=(y)->y_map[y]))
   n_features, n_classes = size(model.weights)
   @assert 1 == n_classes
   RegressionModel(reshape(model.weights, (n_features,)))
@@ -84,7 +85,7 @@ function _check_params(solver, C, eps)
   end
 end
 
-function _problem{X, Y}(x::Array{X, 2}, y::Array{Y, 1})
+function _problem{X, Y}(x::Array{X, 2}, y::Array{Y, 1}; map_y::Union(Function, Nothing)=nothing)
   rows, cols = size(x)
   if rows != length(y)
     throw(ArgumentError("x and y dimentions should match, x=$(size(x)) y=$(size(y))"))
@@ -110,7 +111,7 @@ function _problem{X, Y}(x::Array{X, 2}, y::Array{Y, 1})
   end
 
   # Y
-  y_c = convert(Array{Cdouble, 1}, y)
+  y_c = convert(Array{Cdouble, 1}, (map_y != nothing ? map(map_y, y) : y))
 
   Problem(rows, cols, pointer(y_c), pointer(p_nodes), -1)
 end
