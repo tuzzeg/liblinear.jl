@@ -38,7 +38,7 @@ immutable Model
   nr_class::Int # number of classes
   nr_feature::Int
   weights::Array{Float64, 2}
-  label::Array{Int, 1} # label of each class
+  labels::Array{Int, 1} # label of each class
   bias::Float32
 end
 
@@ -67,10 +67,26 @@ function fit{Y}(T, x, y::Array{Y, 2}, params; verbose::Bool=false)#={{{=##=}}}=#
 end
 
 function predict{X}(model::RegressionModel, x::Array{X, 2})
-  w = model.weights
-  r = x * w
-  o = ones(r)
-  o ./ (o+exp(-r))
+  _prob(x, model.weights)
+end
+
+# Classification
+
+function fit{X, Y}(::Type{ClassificationModel{Y}}, x::Array{X, 2}, y::Array{Y, 1}, params::ClassificationParams{2, Y}; verbose::Bool=false)
+  y_map = (Y=>Cdouble)[y=>i for (i, y) in enumerate(params.labels)]
+  model = _train(_parameter(params), _problem(x, y; map_y=(y)->y_map[y]))
+  n_features, n_classes = size(model.weights)
+
+  @assert 1 == n_classes
+  @assert [1, 2] == model.labels
+
+  w = reshape(model.weights, (n_features, n_classes))
+  ClassificationModel(params.labels, w)
+end
+
+function predict{X, Y}(model::ClassificationModel{Y}, x::Array{X, 2})
+  probs = _prob(x, model.weights)
+  Y[0.5<p ? model.labels[1] : model.labels[2]  for p in probs]
 end
 
 function _check_params(solver, C, eps)
@@ -142,6 +158,12 @@ function _train(param::Parameter, problem::Problem; verbose=false)
   free_and_destroy_model(p_model)
 
   Model(n_features, n_classes, w, labels, bias)
+end
+
+function _prob(x, w)
+  r = x * w
+  o = ones(r)
+  o ./ (o+exp(-r))
 end
 
 # Cases:

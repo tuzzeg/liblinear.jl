@@ -3,7 +3,7 @@ using Base.Test
 import StatsBase: fit, predict
 
 require("src/liblinear.jl")
-import liblinear: ClassificationParams, RegressionModel
+import liblinear: ClassificationParams, ClassificationModel, RegressionModel
 
 x_train = [
   5.1 3.5 1.4 0.2;
@@ -40,10 +40,29 @@ end
 
 function test_train_unknown_class()
   params = ClassificationParams((-1, 1); eps=0.01)
-
   @test_throws KeyError fit(RegressionModel, x_train, y_train, params)
+end
+
+function test_classification()
+  params = ClassificationParams((0, 1); eps=0.01)
+  model = fit(ClassificationModel{Int}, x_train, y_train, params)
+  @test_approx_eq_eps [0.174465,0.477886,-0.827468,-0.373797] model.weights 1e-4
+
+  y1 = predict(model, x_test)
+  @assert [0, 0, 1, 1] == y1
+end
+
+function test_classification_strings()
+  params = ClassificationParams(("I. setosa", "I. versicolor"); eps=0.01)
+  y_str = ["I. setosa", "I. setosa", "I. versicolor", "I. versicolor"]
+  model = fit(ClassificationModel{ASCIIString}, x_train, y_str, params)
+  y1 = predict(model, x_test)
+  @assert ["I. setosa", "I. setosa", "I. versicolor", "I. versicolor"] == y1
 end
 
 test_train()
 test_train_y_2dim()
 test_train_unknown_class()
+
+test_classification()
+test_classification_strings()
