@@ -53,7 +53,7 @@ end
 
 # Fit regression model for the given x,y
 # x should be of type convertible to Float64
-function fit{X, Y}(::Type{RegressionModel}, x::Array{X, 2}, y::Array{Y, 1}, params::ClassificationParams{2, Y}; verbose::Bool=false)
+function fit{Y}(::Type{RegressionModel}, x, y::Array{Y, 1}, params::ClassificationParams{2, Y}; verbose::Bool=false)
   y_map = (Y=>Cdouble)[y=>i for (i, y) in enumerate(params.labels)]
   model = _train(_parameter(params), _problem(x, y; map_y=(y)->y_map[y]))
   n_features, n_classes = size(model.weights)
@@ -66,13 +66,13 @@ function fit{Y}(T, x, y::Array{Y, 2}, params; verbose::Bool=false)#={{{=##=}}}=#
   fit(T, x, reshape(y, (n_examples,)), params; verbose=verbose)
 end
 
-function predict{X}(model::RegressionModel, x::Array{X, 2})
+function predict(model::RegressionModel, x)
   _prob(x, model.weights)
 end
 
 # Classification
 
-function fit{X, Y}(::Type{ClassificationModel{Y}}, x::Array{X, 2}, y::Array{Y, 1}, params::ClassificationParams{2, Y}; verbose::Bool=false)
+function fit{Y}(::Type{ClassificationModel{Y}}, x, y::Array{Y, 1}, params::ClassificationParams{2, Y}; verbose::Bool=false)
   y_map = (Y=>Cdouble)[y=>i for (i, y) in enumerate(params.labels)]
   model = _train(_parameter(params), _problem(x, y; map_y=(y)->y_map[y]))
   n_features, n_classes = size(model.weights)
@@ -132,6 +132,40 @@ function _problem{X, Y}(x::Array{X, 2}, y::Array{Y, 1}; map_y::Union(Function, N
   Problem(rows, cols, pointer(y_c), pointer(p_nodes), -1)
 end
 
+function _problem{X, Y}(x::SparseMatrixCSC{X, Int}, y::Array{Y, 1}; map_y::Union(Function, Nothing)=nothing)
+  rows, cols = size(x)
+  c = nfilled(x)
+  if rows != length(y)
+    throw(ArgumentError("x and y dimentions should match, x=$(size(x)) y=$(size(y))"))
+  end
+
+  # Need CSR
+  x = x'
+
+  # X
+  # Allocate nodes for each row (count: c) and 1 sentinel at each row (count: rows)
+  nodes = Array(FeatureNode, c+rows)
+  p_nodes = Array(Ptr{FeatureNode}, rows)
+  for r in 1:rows
+    i0, i1 = x.colptr[r], x.colptr[r+1]-1
+    p_nodes[r] = pointer(nodes, i0+r-1)
+    for i in i0:i1
+      c = x.rowval[i]
+      v = x.nzval[i]
+      if !isfinite(v)
+        throw(ArgumentError("NaN of Inf value, r=$r c=$c v=$v"))#={{{=##=}}}=#
+      end
+      nodes[i+r-1] = FeatureNode(c, convert(Cfloat, v))
+    end
+    nodes[i1+r] = FeatureNode(-1, convert(Cfloat, 0))
+  end
+
+  # Y
+  y_c = convert(Array{Cdouble, 1}, (map_y != nothing ? map(map_y, y) : y))
+
+  Problem(rows, cols, pointer(y_c), pointer(p_nodes), -1)
+end
+
 function _parameter(p::ClassificationParams)
   Parameter(p.solver, p.eps, p.C, 0, C_NULL, C_NULL, 0.1)
 end
@@ -170,6 +204,7 @@ end
 # - Classification/Regression
 # - 2 Class/Multiclass
 # - Bias/no bias
+# - dense/sparse
 
 # StatBase.fit(::Type{Model}, x, y, params) :: Model
 # StatBase.predict(model::Model, x) -> x'
