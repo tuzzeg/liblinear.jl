@@ -51,6 +51,9 @@ function _update_from_line!(x, y, l::String)
           pos = endof(l)
           st = 4
         end
+        if 3 <= st
+          _finished_row(x)
+        end
       end
     elseif st == 1
       pos = _skip_space(l, pos)
@@ -70,6 +73,9 @@ function _update_from_line!(x, y, l::String)
           throw(ParseError("Expected ':' [$l]"))
         end
       end
+      if 3 <= st
+        _finished_row(x)
+      end
     elseif st == 2
       nextpos = search(l, [' ', '#'], pos)
       if 0 < nextpos
@@ -81,11 +87,17 @@ function _update_from_line!(x, y, l::String)
         st = 4
         pos = endof(l)
       end
+      if 3 <= st
+        _finished_row(x)
+      end
     elseif st == 3
       st = 4
       pos = endof(l)
     end
   end
+end
+
+function _finished_row(x)
   push!(x.colptr, endof(x.rowval)+1)
   x.n += 1
 end
