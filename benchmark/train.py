@@ -20,5 +20,5 @@ recall = recall_score(y_test, y1_test)
 accuracy = accuracy_score(y_test, y1_test)
 f1 = f1_score(y_test, y1_test)
 
-print "precision=%.5f recall=%.5f accuracy=%.5f f1=%.5f" % (precision, recall, accuracy, f1)
-print "time: read=%.3f train=%.3f test=%.3f" % (t1-t0, t_train-t1, t_test-t_train)
+print "python: precision=%.5f recall=%.5f f1=%.5f" % (precision, recall, f1)
+print "python: read=%.3f train=%.3f test=%.3f" % (t1-t0, t_train-t1, t_test-t_train)

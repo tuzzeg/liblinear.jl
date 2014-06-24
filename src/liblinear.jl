@@ -84,7 +84,7 @@ function fit{Y}(::Type{ClassificationModel{Y}}, x, y::Array{Y, 1}, params::Class
   ClassificationModel(params.labels, w)
 end
 
-function predict{X, Y}(model::ClassificationModel{Y}, x::Array{X, 2})
+function predict{Y}(model::ClassificationModel{Y}, x)
   probs = _prob(x, model.weights)
   Y[0.5<p ? model.labels[1] : model.labels[2]  for p in probs]
 end
