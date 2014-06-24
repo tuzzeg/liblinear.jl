@@ -1,36 +1,24 @@
+using Base.Test
+
 require("src/svmlight.jl")
 
 function test_line()
-  l = "+1  1:2.0 2:-5 # aa"
+  io = IOBuffer("+1  1:2.0 2:-5 # aa")
 
-  x = sparse(Int[], Int[], Float64[])
-  y = Float64[]
+  x, y = read_svmlight(io)
 
-  _update_from_line!(x, y, l)
-
-  dump(x)
-  dump(y)
-
-  println(x)
-
-  # @test_approx_eq 
+  @test_approx_eq [2.0 -5] x
+  @test_approx_eq [1] y
 end
 
 function test_line1()
-  l = "+1  1:2.0 2:-5 "
+  io = IOBuffer("+1  1:2.0 2:-5 ")
 
-  x = sparse(Int[], Int[], Float64[])
-  y = Float64[]
+  x, y = read_svmlight(io)
 
-  _update_from_line!(x, y, l)
-
-  dump(x)
-  dump(y)
-
-  println(x)
-
-  # @test_approx_eq 
+  @test_approx_eq [2.0 -5] x
+  @test_approx_eq [1] y
 end
 
-# test_line()
+test_line()
 test_line1()

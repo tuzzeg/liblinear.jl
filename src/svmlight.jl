@@ -1,13 +1,11 @@
-function read_svmlight(file)
+function read_svmlight(io::IO)
   # Build transposed sparse matrix
   x = SparseMatrixCSC(0, 0, Int[], Int[], Float64[])
   y = Float64[]
-  open(file, "r") do f
-    push!(x.colptr, 1)
-    for l in eachline(f)
-      l = chomp(l)
-      _update_from_line!(x, y, l)
-    end
+  push!(x.colptr, 1)
+  for l in eachline(io)
+    l = chomp(l)
+    _update_from_line!(x, y, l)
   end
   x', y
 end
