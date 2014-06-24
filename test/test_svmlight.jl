@@ -66,9 +66,22 @@ function test_target_only()
   @test_approx_eq [1] y
 end
 
+function test_predefined_column_count()
+  s = "1 1:1 5:1 8:1 15:1"
+
+  x, y = read_svmlight(IOBuffer(s); features=5)
+  @assert (1, 5) == size(x)
+  @test_approx_eq [1 0 0 0 1] x
+
+  x, y = read_svmlight(IOBuffer(s); features=10)
+  @assert (1, 10) == size(x)
+  @test_approx_eq [1 0 0 0 1 0 0 1 0 0] x
+end
+
 test_line()
 test_line_ending_space()
 test_file()
 test_comment_only()
 test_comments()
 test_target_only()
+test_predefined_column_count()
