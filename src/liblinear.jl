@@ -78,9 +78,10 @@ function fit{Y}(::Type{ClassificationModel{Y}}, x, y::Array{Y, 1}, params::Class
   n_features, n_classes = size(model.weights)
 
   @assert 1 == n_classes
-  @assert [1, 2] == model.labels
+  @assert [1, 2] == model.labels || [2, 1] == model.labels
+  w_sign = [1, 2] == model.labels ? +1 : -1
 
-  w = reshape(model.weights, (n_features, n_classes))
+  w = reshape(w_sign*model.weights, (n_features, n_classes))
   ClassificationModel(params.labels, w)
 end
 
