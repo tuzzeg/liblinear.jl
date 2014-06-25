@@ -31,6 +31,6 @@ recall = recall_score(y_test, y1_test)
 accuracy = accuracy_score(y_test, y1_test)
 f1 = f1_score(y_test, y1_test)
 
-print "python: train=%s test=%s [%s]" % (x_train.shape, x_train.shape, prefix_file)
+print "python: train=%s test=%s [%s]" % (x_train.shape, x_test.shape, prefix_file)
 print "  precision=%.5f recall=%.5f f1=%.5f" % (precision, recall, f1)
 print "  read=%.5f train=%.5f test=%.5f" % (t1-t0, t_train-t1, t_test-t_train)
