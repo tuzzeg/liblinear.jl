@@ -1,5 +1,7 @@
-using liblinear
 using Base.Test
 
-# write your own tests here
-@test 1 == 1
+require("test/test_c.jl")
+require("test/test_train.jl")
+require("test/test_sparse.jl")
+
+require("test/test_svmlight.jl")

@@ -45,9 +45,6 @@ function test_train()
   w = pointer_to_array(model.w, int(model.nr_feature))
   labels = pointer_to_array(model.label, int(model.nr_class))
 
-  println(w)
-  println(labels)
-
   @test_approx_eq_eps [-0.67219, 0.49949, 0.41542, 0.41921] w 1e-4
 end
 
