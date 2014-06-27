@@ -1,7 +1,6 @@
 module c
 
-# include("../deps/deps.jl")
-const liblinear="/usr/local/Cellar/liblinear/1.94/lib/liblinear"
+include("../deps/deps.jl")
 
 immutable FeatureNode
   index::Cint
