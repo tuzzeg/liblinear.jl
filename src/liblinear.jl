@@ -10,28 +10,30 @@ immutable ClassificationParams{N, Y}
   C::Float64
   eps::Float64
   labels::NTuple{N, Y} # expected target values
-  function ClassificationParams(solver::Int, C::Float64, eps::Float64, labels::NTuple{N, Y})
+  bias::Float64
+  function ClassificationParams(solver, C, eps, labels, bias)
     _check_params(solver, C, eps)
-    new(solver, C, eps, labels)
+    new(solver, C, eps, labels, bias)
   end
 end
 
-function ClassificationParams{N, Y}(labels::NTuple{N, Y}; solver::Int=0, C::Float64=1.0, eps::Float64=0.1)
-  ClassificationParams{N, Y}(solver, C, eps, labels)
+function ClassificationParams{N, Y}(labels::NTuple{N, Y}; solver::Int=0, C::Float64=1.0, eps::Float64=0.1, bias::Float64=-1.0)
+  ClassificationParams{N, Y}(solver, C, eps, labels, bias)
 end
 
 immutable RegressionParams
   solver::Int
   C::Float64
   eps::Float64
-  function RegressionParams(solver::Int, C::Float64, eps::Float64)
+  bias::Float64
+  function RegressionParams(solver::Int, C::Float64, eps::Float64, bias::Float64)
     _check_params(solver, C, eps)
-    new(solver, C, eps)
+    new(solver, C, eps, bias)
   end
 end
 
-function RegressionParams(; solver::Int=0, C::Float64=1.0, eps::Float64=0.1)
-  RegressionParams(solver, C, eps)
+function RegressionParams(; solver::Int=0, C::Float64=1.0, eps::Float64=0.1, bias::Float64=-1.0)
+  RegressionParams(solver, C, eps, bias)
 end
 
 immutable Model
@@ -45,20 +47,22 @@ end
 immutable ClassificationModel{Y} <: StatisticalModel
   labels::NTuple{2, Y}
   weights::Array{Float64, 2}
+  bias::Float32
 end
 
 immutable RegressionModel
   weights::Array{Float64, 1}
+  bias::Float32
 end
 
 # Fit regression model for the given x,y
 # x should be of type convertible to Float64
 function fit{Y}(::Type{RegressionModel}, x, y::Array{Y, 1}, params::ClassificationParams{2, Y}; verbose::Bool=false)
   y_map = (Y=>Cdouble)[y=>i for (i, y) in enumerate(params.labels)]
-  model = _train(_parameter(params), _problem(x, y; map_y=(y)->y_map[y]))
+  model = _train(_parameter(params), _problem(x, y, params.bias; map_y=(y)->y_map[y]))
   n_features, n_classes = size(model.weights)
   @assert 1 == n_classes
-  RegressionModel(reshape(model.weights, (n_features,)))
+  RegressionModel(reshape(model.weights, (n_features,)), model.bias)
 end
 
 function fit{Y}(T, x, y::Array{Y, 2}, params; verbose::Bool=false)#={{{=##=}}}=#
@@ -67,14 +71,14 @@ function fit{Y}(T, x, y::Array{Y, 2}, params; verbose::Bool=false)#={{{=##=}}}=#
 end
 
 function predict(model::RegressionModel, x)
-  _prob(x, model.weights)
+  _prob(x, model.weights, model.bias)
 end
 
 # Classification
 
 function fit{Y}(::Type{ClassificationModel{Y}}, x, y::Array{Y, 1}, params::ClassificationParams{2, Y}; verbose::Bool=false)
   y_map = (Y=>Cdouble)[y=>i for (i, y) in enumerate(params.labels)]
-  model = _train(_parameter(params), _problem(x, y; map_y=(y)->y_map[y]))
+  model = _train(_parameter(params), _problem(x, y, params.bias; map_y=(y)->y_map[y]))
   n_features, n_classes = size(model.weights)
 
   @assert 1 == n_classes
@@ -82,11 +86,11 @@ function fit{Y}(::Type{ClassificationModel{Y}}, x, y::Array{Y, 1}, params::Class
   w_sign = [1, 2] == model.labels ? +1 : -1
 
   w = reshape(w_sign*model.weights, (n_features, n_classes))
-  ClassificationModel(params.labels, w)
+  ClassificationModel(params.labels, w, model.bias)
 end
 
 function predict{Y}(model::ClassificationModel{Y}, x)
-  probs = _prob(x, model.weights)
+  probs = _prob(x, model.weights, model.bias)
   Y[0.5<p ? model.labels[1] : model.labels[2]  for p in probs]
 end
 
@@ -102,14 +106,15 @@ function _check_params(solver, C, eps)
   end
 end
 
-function _problem{X, Y}(x::Array{X, 2}, y::Array{Y, 1}; map_y::Union(Function, Nothing)=nothing)
+function _problem{X, Y}(x::Array{X, 2}, y::Array{Y, 1}, bias::Float64; map_y::Union(Function, Nothing)=nothing)
   rows, cols = size(x)
   if rows != length(y)
     throw(ArgumentError("x and y dimentions should match, x=$(size(x)) y=$(size(y))"))
   end
 
   # X
-  nodes = Array(FeatureNode, rows*(cols+1))
+  c_bias = 0<bias ? 1 : 0
+  nodes = Array(FeatureNode, rows*(cols+c_bias+1))
   p_nodes = Array(Ptr{FeatureNode}, rows)
   i = 1
   for r in 1:rows
@@ -123,6 +128,10 @@ function _problem{X, Y}(x::Array{X, 2}, y::Array{Y, 1}; map_y::Union(Function, N
         i += 1
       end
     end
+    if 0 < bias
+      nodes[i] = FeatureNode(cols+1, convert(Cfloat, bias))
+      i += 1
+    end
     nodes[i] = FeatureNode(-1, convert(Cfloat, 0))
     i += 1
   end
@@ -130,41 +139,46 @@ function _problem{X, Y}(x::Array{X, 2}, y::Array{Y, 1}; map_y::Union(Function, N
   # Y
   y_c = convert(Array{Cdouble, 1}, (map_y != nothing ? map(map_y, y) : y))
 
-  Problem(rows, cols, pointer(y_c), pointer(p_nodes), -1)
+  Problem(rows, cols+c_bias, pointer(y_c), pointer(p_nodes), bias)
 end
 
-function _problem{X, Y}(x::SparseMatrixCSC{X, Int}, y::Array{Y, 1}; map_y::Union(Function, Nothing)=nothing)
+function _problem{X, Y}(x::SparseMatrixCSC{X, Int}, y::Array{Y, 1}, bias::Float64; map_y::Union(Function, Nothing)=nothing)
   rows, cols = size(x)
   c = nfilled(x)
   if rows != length(y)
     throw(ArgumentError("x and y dimentions should match, x=$(size(x)) y=$(size(y))"))
   end
 
-  # Need CSR
+  # Transpose because we need CSR, not CSC matrix
   x = x'
 
   # X
   # Allocate nodes for each row (count: c) and 1 sentinel at each row (count: rows)
-  nodes = Array(FeatureNode, c+rows)
+  c_bias = 0<bias ? 1 : 0
+  nodes = Array(FeatureNode, c+(c_bias+1)*rows)
   p_nodes = Array(Ptr{FeatureNode}, rows)
   for r in 1:rows
     i0, i1 = x.colptr[r], x.colptr[r+1]-1
-    p_nodes[r] = pointer(nodes, i0+r-1)
+    i_adj = (c_bias+1)*(r-1)+1 # adjust because we have extra nodes: 1 sentinel and 1 possible bias
+    p_nodes[r] = pointer(nodes, i0+i_adj-1)
     for i in i0:i1
       c = x.rowval[i]
       v = x.nzval[i]
       if !isfinite(v)
-        throw(ArgumentError("NaN of Inf value, r=$r c=$c v=$v"))#={{{=##=}}}=#
+        throw(ArgumentError("NaN of Inf value, r=$r c=$c v=$v"))
       end
-      nodes[i+r-1] = FeatureNode(c, convert(Cfloat, v))
+      nodes[i+i_adj-1] = FeatureNode(c, convert(Cfloat, v))
     end
-    nodes[i1+r] = FeatureNode(-1, convert(Cfloat, 0))
+    if 0 < bias
+      nodes[i1+i_adj] = FeatureNode(cols+1, convert(Cfloat, bias))
+    end
+    nodes[i1+i_adj+c_bias] = FeatureNode(-1, convert(Cfloat, 0))
   end
 
   # Y
   y_c = convert(Array{Cdouble, 1}, (map_y != nothing ? map(map_y, y) : y))
 
-  Problem(rows, cols, pointer(y_c), pointer(p_nodes), -1)
+  Problem(rows, cols+c_bias, pointer(y_c), pointer(p_nodes), bias)
 end
 
 function _parameter(p::ClassificationParams)
@@ -185,29 +199,26 @@ function _train(param::Parameter, problem::Problem; verbose=false)
   n_features = int(model.nr_feature)
   n_classes = int(model.nr_class)
   # Different weight vector in two classes vs multi class classification
-  w_dims = (2 == n_classes) ? (n_features,1) : (n_features, n_classes)
+  w_dims = (n_features + (0<model.bias), 2==n_classes ? 1 : n_classes)
   w = copy(pointer_to_array(model.w, w_dims))
   labels = copy(pointer_to_array(model.label, n_classes))
-  bias = float(model.bias)
+  local bias
+  if 0<model.bias
+    bias = w[end]
+    w = w[1:end-1, :]
+  else
+    bias = 0
+  end
 
   free_and_destroy_model(p_model)
 
   Model(n_features, n_classes, w, labels, bias)
 end
 
-function _prob(x, w)
-  r = x * w
+function _prob(x, w, bias)
+  r = x * w .+ bias
   o = ones(r)
   o ./ (o+exp(-r))
 end
-
-# Cases:
-# - Classification/Regression
-# - 2 Class/Multiclass
-# - Bias/no bias
-# - dense/sparse
-
-# StatBase.fit(::Type{Model}, x, y, params) :: Model
-# StatBase.predict(model::Model, x) -> x'
 
 end # module

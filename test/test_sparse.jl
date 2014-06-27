@@ -45,5 +45,19 @@ function test_regression_compare_with_dense()
   @test_approx_eq_eps y1_sparse y1_dense 1e-4
 end
 
+function test_regression_with_bias()
+  params = ClassificationParams((0, 1); eps=0.01, bias=1.0)
+
+  m_sparse = fit(RegressionModel, x_train, y_train, params)
+  m_dense = fit(RegressionModel, full(x_train), y_train, params)
+  @test_approx_eq_eps m_sparse.weights m_dense.weights 1e-4
+
+  y1_sparse = predict(m_sparse, x_test)
+  y1_dense = predict(m_dense, full(x_test))
+  @test_approx_eq_eps y1_sparse y1_dense 1e-4
+end
+
 test_regression()
 test_regression_compare_with_dense()
+
+test_regression_with_bias()

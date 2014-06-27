@@ -60,9 +60,32 @@ function test_classification_strings()
   @assert ["I. setosa", "I. setosa", "I. versicolor", "I. versicolor"] == y1
 end
 
+function test_regression_with_bias()
+  params = ClassificationParams((0, 1); eps=0.01, bias=1.0)
+  model = fit(RegressionModel, x_train, y_train, params)
+  @test_approx_eq_eps [0.157814, 0.464984, -0.826937, -0.372264] model.weights 1e-4
+  @test_approx_eq_eps 0.14089087 model.bias 1e-4
+
+  y1 = predict(model, x_test)
+  @test_approx_eq_eps [0.772256, 0.729764, 0.130827, 0.134380] y1 1e-4
+end
+
+function test_classification_with_bias()
+  params = ClassificationParams((0, 1); eps=0.01, bias=1.0)
+  model = fit(ClassificationModel{Int}, x_train, y_train, params)
+  @test_approx_eq_eps [0.157814, 0.464984, -0.826937, -0.372264] model.weights 1e-4
+  @test_approx_eq_eps 0.14089087 model.bias 1e-4
+
+  y1 = predict(model, x_test)
+  @assert [0, 0, 1, 1] == y1
+end
+
 test_train()
 test_train_y_2dim()
 test_train_unknown_class()
 
 test_classification()
 test_classification_strings()
+
+test_regression_with_bias()
+test_classification_with_bias()
