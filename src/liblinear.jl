@@ -1,5 +1,9 @@
 module liblinear
 
+export
+  ClassificationParams, RegressionParams,
+  ClassificationModel, RegressionModel
+
 import StatsBase: StatisticalModel, fit, predict
 
 include("c.jl")
@@ -65,7 +69,7 @@ function fit{Y}(::Type{RegressionModel}, x, y::Array{Y, 1}, params::Classificati
   RegressionModel(reshape(model.weights, (n_features,)), model.bias)
 end
 
-function fit{Y}(T, x, y::Array{Y, 2}, params; verbose::Bool=false)#={{{=##=}}}=#
+function fit{Y}(T::Type{RegressionModel}, x, y::Array{Y, 2}, params; verbose::Bool=false)
   n_examples, n_features = size(x)
   fit(T, x, reshape(y, (n_examples,)), params; verbose=verbose)
 end
@@ -144,7 +148,7 @@ end
 
 function _problem{X, Y}(x::SparseMatrixCSC{X, Int}, y::Array{Y, 1}, bias::Float64; map_y::Union(Function, Nothing)=nothing)
   rows, cols = size(x)
-  c = nfilled(x)
+  c = nnz(x)
   if rows != length(y)
     throw(ArgumentError("x and y dimentions should match, x=$(size(x)) y=$(size(y))"))
   end
